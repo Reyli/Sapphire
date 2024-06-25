@@ -148,6 +148,15 @@ bool Sapphire::Scripting::ScriptMgr::loadDir( const std::string& dirname, std::s
   }
 }
 
+void Sapphire::Scripting::ScriptMgr::onDebug(uint32_t id, Entity::Player& player, uint32_t param)
+{
+  auto script = m_nativeScriptMgr->getScript(id);
+  if (script)
+    script->onDebug(player, param);
+  else
+    player.sendUrgent("{script {} not found.}", id);
+}
+
 void Sapphire::Scripting::ScriptMgr::onPlayerFirstEnterWorld( Entity::Player& player )
 {
 //   try

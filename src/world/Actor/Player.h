@@ -1025,7 +1025,11 @@ namespace Sapphire::Entity
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    void setPosAndNotifyClient( float x, float y, float z, float rot );
+    void setPosAndNotifyClient(float x, float y, float z, float rot);
+    std::unordered_map< uint32_t, TerritoryPtr > m_privateInstanceMap;
+    TerritoryPtr getOrCreatePrivateInstance(uint32_t zoneId);
+    bool enterPredefinedPrivateInstance(uint32_t zoneId);
+
 
     Common::HuntingLogEntry& getHuntingLogEntry( uint8_t index );
 

@@ -52,6 +52,8 @@ namespace Sapphire::Scripting
      */
     void watchDirectories();
 
+    void onDebug(uint32_t id, Entity::Player& player, uint32_t param);
+
     void onPlayerFirstEnterWorld( Entity::Player& player );
 
     bool onTalk( Entity::Player& player, uint64_t actorId, uint32_t eventId );

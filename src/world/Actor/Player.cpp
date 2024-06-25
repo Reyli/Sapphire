@@ -469,12 +469,27 @@ void Sapphire::Entity::Player::forceZoneing( uint32_t zoneId )
 
 void Sapphire::Entity::Player::forceZoneing( uint32_t zoneId, FFXIVARR_POSITION3 pos, float rot, bool showZoneName )
 {
-  if( zoneId == 0 )
+  if (zoneId == 0)
   {
     zoneId = getCurrentTerritory()->getTerritoryTypeId();
+    pos.x = m_pos.x;
+    pos.y = m_pos.y;
+    pos.z = m_pos.z;
+    rot = m_rot;
   }
-  m_queuedZoneing = std::make_shared< QueuedZoning >( zoneId, pos, Util::getTimeMs(), rot );
-  prepareZoning( showZoneName ? zoneId : 0, true, 1, 0 );
+  else
+  {
+    if (pos.x == FLT_MAX)
+      pos.x = m_pos.x;
+    if (pos.y == FLT_MAX)
+      pos.y = m_pos.y;
+    if (pos.z == FLT_MAX)
+      pos.z = m_pos.z;
+    if (rot == FLT_MAX)
+      rot = m_rot;
+  }
+  m_queuedZoneing = std::make_shared< QueuedZoning >(zoneId, pos, Util::getTimeMs(), rot);
+  prepareZoning(showZoneName ? zoneId : 0, true, 1, 0);
 }
 
 void Sapphire::Entity::Player::returnToHomepoint()
@@ -2449,4 +2464,91 @@ void Sapphire::Entity::Player::gaugeSetRaw( uint8_t* pData )
 {
   std::memcpy( &m_gauge, pData, 15 );
   sendActorGauge();
+}
+
+void Sapphire::Entity::Player::setPosAndNotifyClient(float x, float y, float z, float rot)
+{
+  setRot(rot);
+  setPos(x, y, z, true);
+
+  auto setActorPosPacket = makeZonePacket< FFXIVIpcActorSetPos >(getId());
+  setActorPosPacket->data().r16 = Common::Util::floatToUInt16Rot(rot);
+  setActorPosPacket->data().x = x;
+  setActorPosPacket->data().y = y;
+  setActorPosPacket->data().z = z;
+  queuePacket(setActorPosPacket);
+}
+
+Sapphire::TerritoryPtr Sapphire::Entity::Player::getOrCreatePrivateInstance(uint32_t zoneId)
+{
+  auto instance = m_privateInstanceMap[zoneId];
+  if (instance)
+    return instance;
+  auto& terriMgr = Common::Service< Sapphire::World::Manager::TerritoryMgr >::ref();
+  instance = terriMgr.createTerritoryInstance(zoneId);
+  if (instance)
+  {
+    sendDebug("Created instance with id: " + std::to_string(instance->getGuId()) + " -> " + instance->getName());
+    m_privateInstanceMap[zoneId] = instance;
+    return instance;
+  }
+  else
+  {
+    sendDebug("Failed to create instance with id#{0}", zoneId);
+    return nullptr;
+  }
+}
+
+bool Sapphire::Entity::Player::enterPredefinedPrivateInstance(uint32_t zoneId)
+{
+  auto it = Sapphire::World::Manager::TerritoryMgr::instanceSpawnInfo.find(zoneId);
+
+  auto& terriMgr = Common::Service< Sapphire::World::Manager::TerritoryMgr >::ref();
+  auto terri = terriMgr.getZoneByTerritoryTypeId(zoneId);
+  if (terri)
+  {
+    sendDebug("Entering {} as global zone.", zoneId);
+    auto currentZone = getCurrentTerritory();
+    if (currentZone->getAsDirector() || currentZone->getTerritoryTypeInfo()->territoryIntendedUse == Sapphire::World::Manager::TerritoryMgr::TerritoryIntendedUse::BeforeTrialDung)
+    {
+      sendUrgent("Current zone is not suitable for returning, keeping previous location.");
+    }
+    else
+    {
+      m_prevPos = m_pos;
+      m_prevRot = m_rot;
+      m_prevTerritoryTypeId = currentZone->getTerritoryTypeId();
+      m_prevTerritoryId = getTerritoryId();
+    }
+    if (it != Sapphire::World::Manager::TerritoryMgr::instanceSpawnInfo.end())
+    {
+      auto info = it->second;
+      Common::FFXIVARR_POSITION3 pos{ info.pos.x, info.pos.y, info.pos.z };
+      forceZoneing(zoneId, pos, info.rot, false);
+      return true;
+    }
+    else
+    {
+      sendUrgent("instance id: {} is not defined.", zoneId);
+      forceZoneing(zoneId, {0,0,0}, 0, false);
+      return false;
+    }
+  }
+  else
+  {
+    if (it != Sapphire::World::Manager::TerritoryMgr::instanceSpawnInfo.end())
+    {
+      auto info = it->second;
+      auto instance = getOrCreatePrivateInstance(zoneId);
+      if (instance)
+        return setInstance(instance, info.pos, info.rot);
+    }
+    else
+    {
+      sendUrgent("instance id: {} is not defined.", zoneId);
+      auto instance = getOrCreatePrivateInstance(zoneId);
+      if (instance)
+        return setInstance(instance);
+    }
+  }
 }

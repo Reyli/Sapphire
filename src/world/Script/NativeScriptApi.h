@@ -47,6 +47,8 @@ namespace Sapphire::ScriptAPI
     * @return The hash_code of the script
     */
     virtual std::size_t getType() const;
+
+    virtual void onDebug(Sapphire::Entity::Player& player, uint32_t param);
   };
 
 

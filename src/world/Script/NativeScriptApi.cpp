@@ -30,6 +30,10 @@ namespace Sapphire::ScriptAPI
     return m_type;
   }
 
+  void ScriptObject::onDebug(Entity::Player& player, uint32_t param)
+  {
+  }
+
   ///////////////////////////////////////////////////////////////////
 
   StatusEffectScript::StatusEffectScript( uint32_t effectId ) :
